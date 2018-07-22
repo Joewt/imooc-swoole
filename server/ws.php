@@ -9,15 +9,16 @@
 class Ws
 {
     const HOST = "0.0.0.0";
-    const PORT = 9503;
+    const PORT = 9504;
     public $ws = null;
 
     public function __construct()
     {
+
         $this->ws = new swoole_websocket_server(self::HOST,self::PORT);
         $this->ws->set([
             'enable_static_handler' => true,
-            'document_root'         => "/Users/joe/Documents/study/php/swoole/thinkphp/public/static/",
+            'document_root'         => "/Users/joe/Documents/study/php/swoole/thinkphp/public/static",
             'worker_num'            => 5,
             'task_worker_num'       => 5,
         ]);
@@ -29,6 +30,10 @@ class Ws
         $this->ws->on("finish",[$this,'onFinish']);
         $this->ws->on('close',[$this,'onClose']);
         $this->ws->start();
+
+
+
+
     }
 
     /**
@@ -40,6 +45,15 @@ class Ws
     {
         define('APP_PATH', __DIR__ . '/../application/');
         require __DIR__ . '/../thinkphp/start.php';
+
+        //清空 live_redis_key
+        $clients = \app\common\lib\redis\Predis::getInstance()->smember(config('redis.live_redis_key'));
+
+        foreach($clients as $fd){
+            //$_POST['http_server']->push($fd, "hello");
+            \app\common\lib\redis\Predis::getInstance()->srem(config('redis.live_redis_key'),$fd);
+        }
+
     }
 
     /**
@@ -49,6 +63,7 @@ class Ws
      */
     public function onRequest($request, $response)
     {
+
         $_SERVER = [];
         if(isset($request->server)){
             foreach($request->server as $k => $v){
@@ -83,6 +98,13 @@ class Ws
             }
         }
 
+        $_FILES = [];
+        if(isset($request->files)){
+            foreach ($request->files as $k => $v){
+                $_FILES[$k] = $v;
+            }
+        }
+
         $_POST['ws_server'] = $this->ws;
         ob_start();
         try {
@@ -110,14 +132,18 @@ class Ws
 
     }
 
-    public function onOpen()
+    public function onOpen($ws, $request)
     {
+
+        \app\common\lib\redis\Predis::getInstance()->sadd(config('redis.live_redis_key'),$request->fd);
+        echo "client id: ".$request->fd.PHP_EOL;
 
     }
 
-    public function onMessage()
+    public function onMessage($ws, $frame)
     {
-
+        echo "ser-push-message:{$frame->data}\n";
+        $ws->push($frame->fd, "server-push:".date("Y-m-d H:i:s"));
     }
 
     public function onFinish()
@@ -125,9 +151,10 @@ class Ws
 
     }
 
-    public function onClose()
+    public function onClose($ws, $fd)
     {
-
+        \app\common\lib\redis\Predis::getInstance()->srem(config('redis.live_redis_key'),$fd);
+        echo "client live: ".$fd.PHP_EOL;
     }
 
 }

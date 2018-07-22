@@ -2,10 +2,11 @@
 
 namespace app\admin\controller;
 
-use app\common\lib\Util;
+use think\Controller;
+use think\Request;
+use app\common\lib\redis\Predis;
 
-
-class Image
+class Live extends Controller
 {
     /**
      * 显示资源列表
@@ -15,18 +16,18 @@ class Image
     public function index()
     {
 
-        $file = request()->file('file');
-        $info = $file->move('../public/static/upload');
-        //print_r($file);
-        if($info){
-            $data = [
-                'image'  => config('live.host')."/upload/".$info->getSaveName(),
-            ];
-            return Util::show(config('code.success'),'OK',$data);
-        } else {
-            return Util::show(config('code.error'),'error');
-        }
+    }
 
+    public function push()
+    {
+        print_r($_GET);
+
+        $clients = Predis::getInstance()->smember(config('redis.live_redis_key'));
+
+        foreach($clients as $fd){
+            $_POST['http_server']->push($fd, "hello");
+
+        }
     }
 
     /**

@@ -14,7 +14,8 @@ class index extends Controller
      */
     public function index()
     {
-        //
+
+
     }
 
     /**
